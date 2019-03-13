@@ -70,7 +70,24 @@ public class BEQZ extends FlowControl_IType
 	        b_pc.setBits(pc_old, 0);
 	        pc.setBits(pc_new,0);
 			logger.info(">> set PC to "+pc_new+"\n---------------------------------------------");
+		}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL){
+			boolean predictIsTaken=cpu.getLocalPrediction(cpu.getPC().getBinString());
+			if(predictIsTaken) {
+				BitSet64 bs=new BitSet64();
+		        bs.writeHalf(params.get(OFFSET_FIELD));
+		        String offset=bs.getBinString();
+		        Register pc=cpu.getPC();
+		        Register b_pc=cpu.getBPC();
+		        String pc_old=cpu.getPC().getBinString();
+		        String pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
+		        b_pc.setBits(pc_old, 0);
+		        pc.setBits(pc_new,0);
+				logger.info("L>> set PC to "+pc_new+"\n---------------------------------------------");
+			}else {
+				return;
+			}
 		}
+
 
 
 	}
@@ -107,6 +124,34 @@ public class BEQZ extends FlowControl_IType
 	            throw new MispredictTakenException(); 
 			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.TAKEN) {
 				logger.info(">> correct taken predict");
+			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
+				boolean predictIsTaken;
+				if(cpu.getBPC().getBinString().equals("0")) {
+					predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
+				}else {
+					predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
+				}
+				
+				if(predictIsTaken) {
+					logger.info("L>> correct taken predict updated BHT");
+					cpu.updateLocalPrediction(cpu.getBPC().getBinString(),true);
+				}else {
+					logger.info("L>> incorrect not taken predict updated BHT");
+					String pc_new="";
+		            Register pc=cpu.getPC();
+		            String pc_old=cpu.getPC().getBinString();
+		    
+		            //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
+		            BitSet64 bs_temp=new BitSet64();
+		            bs_temp.writeDoubleWord(-4);
+		            pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
+		    
+		            //updating program counter
+		            pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
+		            pc.setBits(pc_new,0);
+					cpu.updateLocalPrediction(pc_old,true);
+					logger.info("Jumped to "+pc_new+"\n---------------------------------------------");
+				}
 			}
 		    
             
@@ -117,9 +162,30 @@ public class BEQZ extends FlowControl_IType
 		        String pc_b=cpu.getBPC().getBinString();
 		        pc.setBits(pc_b,0);
 				logger.info(">> miss was Not Taken set PC to "+pc_b+"\n---------------------------------------------");
+				
 	            throw new MispredictTakenException(); //change is to mispredict nottaken
-			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.TAKEN) {
+			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.NOTTAKEN) {
 				logger.info(">> correct not taken predict");
+			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
+				boolean predictIsTaken;
+				if(cpu.getBPC().getBinString().equals("0")) {
+					predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
+				}else {
+					predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
+				}
+				if(!predictIsTaken) {
+					logger.info("L>> correct not taken predict updated BHT");
+					cpu.updateLocalPrediction(cpu.getPC().getBinString(),false);
+				}else {
+					logger.info("L>> incorrect taken predict updated BHT");
+					Register pc=cpu.getPC();
+			        String pc_b=cpu.getBPC().getBinString();
+			        pc.setBits(pc_b,0);
+					logger.info(">> miss was Not Taken set PC to "+pc_b+"\n---------------------------------------------");
+					cpu.updateLocalPrediction(pc_b,false);
+			        Register b_pc=cpu.getBPC();
+			        b_pc.setBits("0", 0);
+				}
 			}
 			
 		}

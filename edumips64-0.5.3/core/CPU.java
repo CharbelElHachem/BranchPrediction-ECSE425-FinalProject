@@ -77,7 +77,9 @@ public class CPU
     /** The code and data sections limits*/
     public static final int CODELIMIT = 1024;	// bus da 12 bit (2^12 / 4)
     public static final int DATALIMIT = 512;	// bus da 12 bit (2^12 / 8)
-
+    
+    //prediction memory buffer
+    private int[] localTable;
 	
 	private static CPU cpu;
 
@@ -89,7 +91,15 @@ public class CPU
 		cpu = null;
 	}
 	private CPU()
-	{
+	{	
+		predictMode = PREDICTIONMode.LOCAL;
+		//initialize prediction buffer
+		localTable=new int[4096];
+		for(int i=0; i < localTable.length;i++) {
+			localTable[i]=1;//weak not taken
+		}
+				
+				
 		// To avoid future singleton problems
 		Instruction dummy = Instruction.buildInstruction("BUBBLE");
 
@@ -117,8 +127,7 @@ public class CPU
 		clearPipe();
 		currentPipeStatus = PipeStatus.IF;
 		
-		predictMode = PREDICTIONMode.TAKEN;
-		
+
 		logger.info("CPU Created.");
 	}
 
@@ -214,6 +223,44 @@ public class CPU
     /** This method performs a single pipeline step
     * @throw RAWHazardException when a RAW hazard is detected
     */
+	//branch prediction functions
+	//return true if the branch prediction is "taken" , false if the branch prediction is "not taken"
+	public boolean getLocalPrediction(String address) {
+	   int addressVal = 0;
+	   //reading 12 lsb
+	   for(int i = 0; i < 12; i++) {
+	        if(address.charAt(address.length() -i - 1) == '1') {
+	          addressVal += Math.pow(2, i);
+	        }
+	   }
+	   if(localTable[addressVal] < 2) { // predict not taken
+	        return false;
+	   } else { // predict taken
+	        return true;
+	   }
+	
+	}
+	
+	public void updateLocalPrediction(String address,boolean wasTaken) {
+		int addressVal = 0;
+		for(int i = 0; i < 12; i++) {
+	        if(address.charAt(address.length() -i - 1) == '1') {
+				addressVal += Math.pow(2, i);
+			}
+		}
+		if(localTable[addressVal] < 3 && wasTaken) {
+			localTable[addressVal]+=1;
+		}else if(localTable[addressVal] > 0 && !wasTaken) {
+			localTable[addressVal]-=1;
+
+		}
+		logger.info(">>> updated: "+addressVal);
+    	for(int i=0; i < localTable.length;i++) {
+			logger.info(i+" -> "+localTable[i]);
+		}
+	}
+	
+	
 	public boolean isPredictable;
     public void step() throws MispredictTakenException, IntegerOverflowException, AddressErrorException, HaltException, IrregularWriteOperationException, StoppedCPUException, MemoryElementNotFoundException, IrregularStringOfBitsException, TwosComplementSumException, SynchronousException, BreakException
 	{
@@ -301,6 +348,7 @@ public class CPU
 						logger.info("breaking = 1");
 					}
 				}
+				//redundant
 				if(!isPredictable) {
 					pipe.put(PipeStatus.ID, pipe.get(PipeStatus.IF));
 					pipe.put(PipeStatus.IF, mem.getInstruction(pc));
@@ -432,7 +480,13 @@ public class CPU
 	*   CPU.
     */
     public void reset() 
-    {
+    {	
+
+    	//reset local branch history table
+		for(int i=0; i < localTable.length;i++) {
+			localTable[i]=1;//weak not taken
+		}
+    	
 		// Reset stati della CPU
 		status = CPUStatus.READY;
 		cycles = 0;

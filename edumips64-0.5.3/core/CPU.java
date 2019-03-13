@@ -39,7 +39,7 @@ public class CPU
 
 	
     /** Program Counter*/
-	private Register pc,old_pc;
+	private Register pc,old_pc,b_pc;
 	private Register LO,HI;
 
     /** Pipeline status*/
@@ -63,6 +63,8 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
+	public enum PREDICTIONMode{NOTTAKEN, TAKEN, LOCAL, GLOBAL}
+	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
     /** CPU pipeline, each status contains an Instruction object*/
@@ -106,6 +108,7 @@ public class CPU
 			gpr[i] = new Register();
 		pc = new Register();
 		old_pc = new Register();
+		b_pc = new Register();
 		LO=new Register();
 		HI=new Register();
 
@@ -113,10 +116,15 @@ public class CPU
 		pipe = new HashMap<PipeStatus, Instruction>();
 		clearPipe();
 		currentPipeStatus = PipeStatus.IF;
+		
+		predictMode = PREDICTIONMode.TAKEN;
+		
 		logger.info("CPU Created.");
 	}
 
-	
+	public PREDICTIONMode getPredictionMode() {
+		return predictMode;
+	}
 
 	/** Sets the CPU status.
 	 *  @param status a CPUStatus value
@@ -206,6 +214,7 @@ public class CPU
     /** This method performs a single pipeline step
     * @throw RAWHazardException when a RAW hazard is detected
     */
+	public boolean isPredictable;
     public void step() throws MispredictTakenException, IntegerOverflowException, AddressErrorException, HaltException, IrregularWriteOperationException, StoppedCPUException, MemoryElementNotFoundException, IrregularStringOfBitsException, TwosComplementSumException, SynchronousException, BreakException
 	{
 		/* The integer "breaking" is used to keep track of the BREAK
@@ -283,6 +292,7 @@ public class CPU
 
 			if(status == CPUStatus.RUNNING) {
 				if(pipe.get(PipeStatus.IF) != null) { //rispetto a dinmips scambia le load con le IF
+					isPredictable=false;
 					try {
 						pipe.get(PipeStatus.IF).IF();
 					}
@@ -291,10 +301,24 @@ public class CPU
 						logger.info("breaking = 1");
 					}
 				}
-				pipe.put(PipeStatus.ID, pipe.get(PipeStatus.IF));
-				pipe.put(PipeStatus.IF, mem.getInstruction(pc));
-				old_pc.writeDoubleWord((pc.getValue()));
-				pc.writeDoubleWord((pc.getValue())+4);
+				if(!isPredictable) {
+					pipe.put(PipeStatus.ID, pipe.get(PipeStatus.IF));
+					pipe.put(PipeStatus.IF, mem.getInstruction(pc));
+					old_pc.writeDoubleWord((pc.getValue()));
+					pc.writeDoubleWord((pc.getValue())+4);
+				}else {
+					//do branch prediction
+					//let's assume always taken if it is predictable
+					//we do the same as the above however pc needs to be the target address
+					//we compute that in the branchs IF()
+					//pc is updated to offset lets update next IF with target instruction
+					pipe.put(PipeStatus.ID, pipe.get(PipeStatus.IF));
+					pipe.put(PipeStatus.IF, mem.getInstruction(pc));
+					old_pc.writeDoubleWord((pc.getValue()));
+					pc.writeDoubleWord((pc.getValue())+4);
+					
+				}
+				
 			}
 			else
 			{
@@ -383,6 +407,10 @@ public class CPU
 	public Register getLastPC() {
 		return old_pc;
 	}
+	//pc before branch taken
+	public Register getBPC() {
+		return b_pc;
+	}
 	
 	/** Gets the LO register. It contains integer results of doubleword division
 	* @return a Register object
@@ -421,6 +449,7 @@ public class CPU
 		// Reset program counter
         pc.reset();
 		old_pc.reset();
+		b_pc.reset();
 
 		// Reset memoria
         mem.reset();

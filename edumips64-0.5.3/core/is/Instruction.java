@@ -192,7 +192,7 @@ public abstract class Instruction {
      * Now it is used in order to generate the Dinero trace-file
      *</pre>   
      */
-    public void IF() throws BreakException {}
+    public void IF() throws BreakException, TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException {}
     
     /**
      * <pre>

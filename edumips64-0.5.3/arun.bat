@@ -1,0 +1,1 @@
+java -jar edumips64-svn.jar

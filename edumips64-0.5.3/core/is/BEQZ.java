@@ -49,7 +49,26 @@ public class BEQZ extends FlowControl_IType
 	    syntax="%R,%B";
             name ="BEQZ";
 	}
-	
+	public void IF()
+	throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
+	{
+		cpu.isPredictable=true;
+		//do prediction
+		//in this case we are doing always taken
+		//lets update the pc to target offset
+        //converting offset into a signed binary value of 64 bits in length
+        BitSet64 bs=new BitSet64();
+        bs.writeHalf(params.get(OFFSET_FIELD));
+        String offset=bs.getBinString();
+        Register pc=cpu.getPC();
+        Register b_pc=cpu.getBPC();
+        String pc_old=cpu.getPC().getBinString();
+        String pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
+        b_pc.setBits(pc_old, 0);
+        pc.setBits(pc_new,0);
+		logger.info(">> set PC to "+pc_new+"\n---------------------------------------------");
+
+	}
 	public void ID()
 	throws MispredictTakenException, RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException 	
 	{
@@ -65,20 +84,32 @@ public class BEQZ extends FlowControl_IType
 		boolean condition=rs.equals(zero);
 		if(condition)
 		{
-		    String pc_new="";
-                    Register pc=cpu.getPC();
-                    String pc_old=cpu.getPC().getBinString();
+			//our prediction was correct nothing to do but update table if we had one
+			if(false) {
+				String pc_new="";
+	            Register pc=cpu.getPC();
+	            String pc_old=cpu.getPC().getBinString();
+	    
+	            //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
+	            BitSet64 bs_temp=new BitSet64();
+	            bs_temp.writeDoubleWord(-4);
+	            pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
+	    
+	            //updating program counter
+	            pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
+	            pc.setBits(pc_new,0);
+				logger.info("Jumped to "+pc_new+"\n---------------------------------------------");
+	            throw new MispredictTakenException(); 
+			}
+		    
             
-                    //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
-                    BitSet64 bs_temp=new BitSet64();
-                    bs_temp.writeDoubleWord(-4);
-                    pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
-            
-                    //updating program counter
-                    pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-                    pc.setBits(pc_new,0);
-        			logger.info("Jumped to "+pc_new+"\n---------------------------------------------");
-                    throw new MispredictTakenException(); 
+		}else {
+			//incorrect prediction, is not taken
+	        Register pc=cpu.getPC();
+	        String pc_b=cpu.getBPC().getBinString();
+	        pc.setBits(pc_b,0);
+			logger.info(">> miss was Not Taken set PC to "+pc_b+"\n---------------------------------------------");
+            throw new MispredictTakenException(); //change is to mispredict nottaken
 		}
 	}
       public void pack() throws IrregularStringOfBitsException {

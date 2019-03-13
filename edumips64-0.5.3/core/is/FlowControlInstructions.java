@@ -36,6 +36,7 @@ import edumips64.utils.*;
 public abstract class FlowControlInstructions extends Instruction {
     protected static CPU cpu=CPU.getInstance();
     public void IF()
+    		throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
     {
         Dinero din=Dinero.getInstance();
         try

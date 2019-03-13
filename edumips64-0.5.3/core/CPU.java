@@ -63,6 +63,8 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
+	public enum PREDICTIONMode{NOTTAKEN, TAKEN, LOCAL, GLOBAL}
+	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
     /** CPU pipeline, each status contains an Instruction object*/
@@ -114,10 +116,15 @@ public class CPU
 		pipe = new HashMap<PipeStatus, Instruction>();
 		clearPipe();
 		currentPipeStatus = PipeStatus.IF;
+		
+		predictMode = PREDICTIONMode.TAKEN;
+		
 		logger.info("CPU Created.");
 	}
 
-	
+	public PREDICTIONMode getPredictionMode() {
+		return predictMode;
+	}
 
 	/** Sets the CPU status.
 	 *  @param status a CPUStatus value

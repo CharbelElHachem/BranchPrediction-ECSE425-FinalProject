@@ -68,6 +68,11 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
 	repr.setBits(Converter.intToBin(OFFSET_FIELD_LENGTH, params.get(OFFSET_FIELD)/4), OFFSET_FIELD_INIT);
     }
 
+    /**
+    * Resolve the relevant predictor (or the default prediction) and predict the
+    * result of the branch statement.
+    * Adjust the PC as needed.
+    */
     public void makePrediction(int offset_field) throws IrregularWriteOperationException, TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException {
       BitSet64 bs;
       Register pc, b_pc;
@@ -108,6 +113,9 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
       }
     }
 
+    /**
+    * Respond to the resolved branch condition.
+    */
     public void respondToCondition(boolean condition, String offset) throws IrregularWriteOperationException, TwosComplementSumException, IrregularStringOfBitsException, MispredictTakenException {
       boolean predictIsTaken; // Was the prediction to take the branch?
       switch (cpu.getPredictionMode()) {

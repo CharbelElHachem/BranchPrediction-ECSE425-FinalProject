@@ -52,43 +52,7 @@ public class BEQZ extends FlowControl_IType
 	public void IF()
 	throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
 	{
-    BitSet64 bs;
-    Register pc, b_pc;
-    String pc_old, pc_new, offset;
-    switch(cpu.getPredictionMode()) {
-      case TAKEN:
-        cpu.isPredictable = true;
-        /* Do prediction. In this case we always assume taken.*/
-        bs=new BitSet64();
-        bs.writeHalf(params.get(OFFSET_FIELD));
-        offset=bs.getBinString();
-        pc=cpu.getPC();
-        b_pc=cpu.getBPC();
-        pc_old=cpu.getPC().getBinString();
-        pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-        b_pc.setBits(pc_old, 0);
-        pc.setBits(pc_new,0);
-        logger.info(">> set PC to "+pc_new+"\n---------------------------------------------");
-        break;
-      case LOCAL:
-        boolean predictIsTaken=cpu.getLocalPrediction(cpu.getPC().getBinString());
-        if(predictIsTaken) {
-          bs=new BitSet64();
-          bs.writeHalf(params.get(OFFSET_FIELD));
-          offset=bs.getBinString();
-          pc=cpu.getPC();
-          b_pc=cpu.getBPC();
-          pc_old=cpu.getPC().getBinString();
-          pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-          b_pc.setBits(pc_old, 0);
-          pc.setBits(pc_new,0);
-          logger.info("L>> set PC to "+pc_new+"\n---------------------------------------------");
-        }
-        break;
-      case NOTTAKEN:
-      default:
-        break;
-    }
+    makePrediction(OFFSET_FIELD);
 	}
 	public void ID()
 	throws MispredictTakenException, RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException
@@ -104,77 +68,7 @@ public class BEQZ extends FlowControl_IType
     String offset=bs.getBinString();
 		boolean condition=rs.equals(zero);
 
-    boolean predictIsTaken; // Was the prediction to take the branch?
-    switch (cpu.getPredictionMode()) {
-      case LOCAL:
-        if (cpu.getBPC().getBinString().equals("0")) {
-          predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
-        } else {
-          predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
-        }
-        break;
-      case TAKEN:
-        predictIsTaken = true;
-        break;
-      case NOTTAKEN:
-      default:
-        predictIsTaken = false;
-    }
-		if(condition)             // The branch condition was true (i.e. the branch is to be taken)
-		{
-      // Update based on prediction
-      if (predictIsTaken) {
-        if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) { // Update the BHT as necessary
-          logger.info("L>> Branch correctly predicted taken, updating BHT");
-          cpu.updateLocalPrediction(cpu.getBPC().getBinString(), true);
-        } else { // Prediction was correct, but no table to update (i.e. CPU.PREDICTIONMode.TAKEN)
-          logger.info("L>> Branch correctly predicted taken");
-        }
-      } else {  // Prediction was wrong, must go back
-        String pc_new = "";
-        Register pc = cpu.getPC();
-        String pc_old = cpu.getPC().getBinString();
-
-        // Subtract 4 from pc_old using safe methods
-        BitSet64 bs_temp=new BitSet64();
-        bs_temp.writeDoubleWord(-4);
-        pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
-        pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-        pc.setBits(pc_new,0);
-        if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-          logger.info("L>> Branch incorrectly predicted not taken, updating BHT");
-          cpu.updateLocalPrediction(pc_old, true);
-        } else {
-          logger.info("L>> Branch incorrectly predicted not taken");
-        }
-        logger.info("Branched to " + pc_new + "\n---------------------------------------------");
-        throw new MispredictTakenException();
-      }
-		} else {   // The condition is false and the branch is not to be taken
-      if (predictIsTaken) { // The prediction was incorrect and we branched unnecessarily
-        Register pc = cpu.getPC();
-        String pc_b = cpu.getBPC().getBinString();
-        pc.setBits(pc_b, 0);
-        if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-          cpu.updateLocalPrediction(pc_b, false);
-          Register b_pc = cpu.getBPC();
-          b_pc.setBits("0", 0);
-          logger.info("L>> Branch not taken, incorrectly predicted taken, updating BHT");
-        } else {
-          logger.info("L>> Branch not taken, incorrectly predicted taken");
-        }
-        logger.info(">> Setting PC to " + pc_b + "\n---------------------------------------------");
-        throw new MispredictTakenException();
-      }
-      else {  // Prediction was correct
-        if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-          cpu.updateLocalPrediction(cpu.getPC().getBinString(),false);
-          logger.info("L>> Correctly predicted not taken, updating BHT");
-        } else {
-          logger.info("L>> Correctly predicted not taken");
-        }
-      }
-		}
+    respondToCondition(condition, offset);
 	}
       public void pack() throws IrregularStringOfBitsException {
 	repr.setBits(OPCODE_VALUE, OPCODE_VALUE_INIT);

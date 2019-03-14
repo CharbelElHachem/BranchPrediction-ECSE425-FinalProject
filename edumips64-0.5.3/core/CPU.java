@@ -31,25 +31,25 @@ import edumips64.utils.*;
 /** This class models a MIPS CPU with 32 64-bit General Purpose Registers.
 *  @author Andrea Spadaccini, Simona Ullo, Antonella Scandura
 */
-public class CPU 
+public class CPU
 {
 	private Memory mem;
 	private Register[] gpr;
-    private static final Logger logger = Logger.getLogger(CPU.class.getName());
+  private static final Logger logger = Logger.getLogger(CPU.class.getName());
 
-	
+
     /** Program Counter*/
 	private Register pc,old_pc,b_pc;
 	private Register LO,HI;
 
-    /** Pipeline status*/
-    public enum PipeStatus {IF, ID, EX, MEM, WB};
+  /** Pipeline status*/
+  public enum PipeStatus {IF, ID, EX, MEM, WB};
 
 	/** CPU status.
 	 * 	READY - the CPU has been initialized but the symbol table hasn't been
 	 *  already filled by the Parser. This means that you can't call the step()
 	 *  method, or you'll get a StoppedCPUException.
-	 *  
+	 *
 	 * 	RUNNING - the CPU is executing a program, you can call the step()
 	 * 	method, and the CPU will fetch additional instructions from the symbol
 	 * 	table
@@ -63,7 +63,7 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
-	public enum PREDICTIONMode{NOTTAKEN, TAKEN, LOCAL, GLOBAL}
+	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBAL}
 	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
@@ -77,29 +77,32 @@ public class CPU
     /** The code and data sections limits*/
     public static final int CODELIMIT = 1024;	// bus da 12 bit (2^12 / 4)
     public static final int DATALIMIT = 512;	// bus da 12 bit (2^12 / 8)
-    
+
     //prediction memory buffer
     private int[] localTable;
-	
+		private static final int ADDRESSBITS = 12;
+		private static final int NBITS = 2;
+		public boolean isPredictable;
+
 	private static CPU cpu;
 
 	/** Statistics */
-	private int cycles, instructions, RAWStalls, takenStalls; 
+	private int cycles, instructions, RAWStalls, takenStalls;
 
 	/** Static initializer */
 	static {
 		cpu = null;
 	}
 	private CPU()
-	{	
+	{
 		predictMode = PREDICTIONMode.LOCAL;
-		//initialize prediction buffer
-		localTable=new int[4096];
-		for(int i=0; i < localTable.length;i++) {
-			localTable[i]=1;//weak not taken
+		// initialize prediction buffer to support indexing by ADDRESSBITS bits
+		localTable = new int[(int)Math.pow(2, ADDRESSBITS)];
+		for(int i = 0; i < localTable.length; i++) {
+			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
 		}
-				
-				
+
+
 		// To avoid future singleton problems
 		Instruction dummy = Instruction.buildInstruction("BUBBLE");
 
@@ -126,7 +129,7 @@ public class CPU
 		pipe = new HashMap<PipeStatus, Instruction>();
 		clearPipe();
 		currentPipeStatus = PipeStatus.IF;
-		
+
 
 		logger.info("CPU Created.");
 	}
@@ -156,15 +159,15 @@ public class CPU
         pipe.put(PipeStatus.EX, null);
         pipe.put(PipeStatus.MEM, null);
         pipe.put(PipeStatus.WB, null);
-    } 
+    }
 
 	public static CPU getInstance()
     {
-		if(cpu == null) 
+		if(cpu == null)
 			cpu = new CPU();
 		return cpu;
 	}
-    
+
     public Register[] getRegisters()
     {
         return gpr;
@@ -173,13 +176,13 @@ public class CPU
     public Memory getMemory()
     {
         return mem;
-    }        
-    
+    }
+
     public SymbolTable getSymbolTable()
     {
         return symTable;
     }
-    
+
     /** This method returns a specific GPR
     * @param index the register number (0-31)
     */
@@ -187,7 +190,7 @@ public class CPU
     {
         return gpr[index];
     }
-    
+
     public Map<PipeStatus, Instruction> getPipeline()
     {
         return pipe;
@@ -199,7 +202,7 @@ public class CPU
 	public int getCycles() {
 		return cycles;
 	}
-	
+
 	/** Returns the number of instructions executed by the CPU
 	 *  @return an integer
 	 */
@@ -207,7 +210,7 @@ public class CPU
 		return instructions;
 	}
 
-	/** Returns the number of RAW Stalls that happened inside the pipeline 
+	/** Returns the number of RAW Stalls that happened inside the pipeline
 	 * @return an integer
 	 */
 	public int getRAWStalls() {
@@ -225,44 +228,36 @@ public class CPU
     */
 	//branch prediction functions
 	//return true if the branch prediction is "taken" , false if the branch prediction is "not taken"
-	public boolean getLocalPrediction(String address) {
-	   int addressVal = 0;
-	   //reading 12 lsb
-	   for(int i = 0; i < 12; i++) {
-	        if(address.charAt(address.length() -i - 1) == '1') {
-	          addressVal += Math.pow(2, i);
-	        }
-	   }
-	   if(localTable[addressVal] < 2) { // predict not taken
-	        return false;
-	   } else { // predict taken
-	        return true;
-	   }
-	
-	}
-	
-	public void updateLocalPrediction(String address,boolean wasTaken) {
-		int addressVal = 0;
-		for(int i = 0; i < 12; i++) {
-	        if(address.charAt(address.length() -i - 1) == '1') {
-				addressVal += Math.pow(2, i);
-			}
+	public boolean getLocalPrediction(Instruction inst) {
+		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
+		int predictorNum = address % localTable.length;
+		if (localTable[predictorNum] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
+			return false;
+		} else {														// Prediction is taken
+			return true;
 		}
-		if(localTable[addressVal] < 3 && wasTaken) {
-			localTable[addressVal]+=1;
-		}else if(localTable[addressVal] > 0 && !wasTaken) {
-			localTable[addressVal]-=1;
+	}
 
+	/**
+	* Update a local n-bit predictor for the given address.
+	*/
+	public void updateLocalPrediction(Instruction inst, boolean wasTaken) {
+		int address = mem.getInstructionIndex(inst) * 4;
+		int predictorNum = address % localTable.length;
+		int oldVal = localTable[predictorNum];
+		if(localTable[predictorNum] < Math.pow(2, NBITS) - 1 && wasTaken) {
+			localTable[predictorNum]+=1;
+		}else if(localTable[predictorNum] > 0 && !wasTaken) {
+			localTable[predictorNum]-=1;
 		}
-		logger.info(">>> updated: "+addressVal);
-    	for(int i=0; i < localTable.length;i++) {
-			logger.info(i+" -> "+localTable[i]);
-		}
+		logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + localTable[predictorNum]);
+    /*for(int i=0; i < localTable.length;i++) {
+				logger.info(i+" -> "+localTable[i]);
+		}*/
 	}
-	
-	
-	public boolean isPredictable;
-    public void step() throws MispredictTakenException, IntegerOverflowException, AddressErrorException, HaltException, IrregularWriteOperationException, StoppedCPUException, MemoryElementNotFoundException, IrregularStringOfBitsException, TwosComplementSumException, SynchronousException, BreakException
+
+
+  public void step() throws MispredictTakenException, IntegerOverflowException, AddressErrorException, HaltException, IrregularWriteOperationException, StoppedCPUException, MemoryElementNotFoundException, IrregularStringOfBitsException, TwosComplementSumException, SynchronousException, BreakException
 	{
 		/* The integer "breaking" is used to keep track of the BREAK
 		 * instruction. When the BREAK instruction enters ID, the BreakException
@@ -281,9 +276,9 @@ public class CPU
 		try
 		{
 			logger.info("Starting cycle " + ++cycles + "\n---------------------------------------------");
-			currentPipeStatus = PipeStatus.WB; 
+			currentPipeStatus = PipeStatus.WB;
 
-			// Let's execute the WB() method of the instruction located in the 
+			// Let's execute the WB() method of the instruction located in the
 			// WB pipeline status
 			if(pipe.get(PipeStatus.WB)!=null) {
 				pipe.get(PipeStatus.WB).WB();
@@ -291,8 +286,8 @@ public class CPU
 					instructions++;
 			}
 
-			// We put null in WB, in order to avoid that an exception thrown in 
-			// the next instruction leaves the already completed instruction in 
+			// We put null in WB, in order to avoid that an exception thrown in
+			// the next instruction leaves the already completed instruction in
 			// the WB pipeline state
 			pipe.put(PipeStatus.WB, null);
 
@@ -333,13 +328,13 @@ public class CPU
 			pipe.put(PipeStatus.EX, pipe.get(PipeStatus.ID));
 
 			// IF
-			// We don't have to execute any methods, but we must get the new 
+			// We don't have to execute any methods, but we must get the new
 			// instruction from the symbol table.
 			currentPipeStatus = PipeStatus.IF;
 
 			if(status == CPUStatus.RUNNING) {
 				if(pipe.get(PipeStatus.IF) != null) { //rispetto a dinmips scambia le load con le IF
-					isPredictable=false;
+					isPredictable = false;
 					try {
 						pipe.get(PipeStatus.IF).IF();
 					}
@@ -364,9 +359,8 @@ public class CPU
 					pipe.put(PipeStatus.IF, mem.getInstruction(pc));
 					old_pc.writeDoubleWord((pc.getValue()));
 					pc.writeDoubleWord((pc.getValue())+4);
-					
 				}
-				
+
 			}
 			else
 			{
@@ -382,18 +376,18 @@ public class CPU
 		}
 		catch(JumpException ex)
 		{
-            try {
-                if(pipe.get(PipeStatus.IF) != null) //rispetto a dimips scambia le load con le IF
-                        pipe.get(PipeStatus.IF).IF();
-            }
-            catch(BreakException bex) {
+      try {
+          if(pipe.get(PipeStatus.IF) != null) //rispetto a dimips scambia le load con le IF
+                  pipe.get(PipeStatus.IF).IF();
+      }
+      catch(BreakException bex) {
 				logger.info("Caught a BREAK after a Jump: ignoring it.");
-            }
+      }
 			// A J-Type instruction has just modified the Program Counter. We need to
 			// put in the IF state the instruction the PC points to
 			pipe.put(PipeStatus.IF, mem.getInstruction(pc));
 			pipe.put(PipeStatus.EX, pipe.get(PipeStatus.ID));
-			pipe.put(PipeStatus.ID, Instruction.buildInstruction("BUBBLE"));	
+			pipe.put(PipeStatus.ID, Instruction.buildInstruction("BUBBLE"));
 			old_pc.writeDoubleWord((pc.getValue()));
 			pc.writeDoubleWord((pc.getValue())+4);
 			if(syncex != null)
@@ -402,21 +396,21 @@ public class CPU
 		}
 		catch(MispredictTakenException ex)
 		{
-            try {
-                if(pipe.get(PipeStatus.IF) != null) //rispetto a dimips scambia le load con le IF
-                        pipe.get(PipeStatus.IF).IF();
-            }
-            catch(BreakException bex) {
+      try {
+          if(pipe.get(PipeStatus.IF) != null) //rispetto a dimips scambia le load con le IF
+                  pipe.get(PipeStatus.IF).IF();
+      }
+      catch(BreakException bex) {
 				logger.info("Caught a BREAK after a Jump: ignoring it.");
-            }
-            
-            incrementTakenStalls();
-            
+      }
+
+      incrementTakenStalls();
+
 			// A J-Type instruction has just modified the Program Counter. We need to
 			// put in the IF state the instruction the PC points to
 			pipe.put(PipeStatus.IF, mem.getInstruction(pc));
 			pipe.put(PipeStatus.EX, pipe.get(PipeStatus.ID));
-			pipe.put(PipeStatus.ID, Instruction.buildInstruction("BUBBLE"));	
+			pipe.put(PipeStatus.ID, Instruction.buildInstruction("BUBBLE"));
 			old_pc.writeDoubleWord((pc.getValue()));
 			pc.writeDoubleWord((pc.getValue())+4);
 			if(syncex != null)
@@ -439,9 +433,9 @@ public class CPU
 		catch(HaltException ex)
 		{
 			pipe.put(PipeStatus.WB, null);
-			throw ex;		
+			throw ex;
 		}
-	}   
+	}
 
 	/** Gets the Program Counter register
 	 *  @return a Register object
@@ -459,34 +453,34 @@ public class CPU
 	public Register getBPC() {
 		return b_pc;
 	}
-	
+
 	/** Gets the LO register. It contains integer results of doubleword division
 	* @return a Register object
 	*/
 	public Register getLO() {
-		return LO;   
+		return LO;
 	}
-  
+
 	/** Gets the HI register. It contains integer results of doubleword division
 	* @return a Register object
 	*/
 	public Register getHI(){
 		return HI;
 	}
-    
-    /** This method resets the CPU components (GPRs, memory,statistics, 
+
+    /** This method resets the CPU components (GPRs, memory,statistics,
     *   PC, pipeline and Symbol table).
-	*   It resets also the Dinero Tracefile object associated to the current 
+	*   It resets also the Dinero Tracefile object associated to the current
 	*   CPU.
     */
-    public void reset() 
-    {	
+    public void reset()
+    {
 
     	//reset local branch history table
 		for(int i=0; i < localTable.length;i++) {
 			localTable[i]=1;//weak not taken
 		}
-    	
+
 		// Reset stati della CPU
 		status = CPUStatus.READY;
 		cycles = 0;
@@ -540,11 +534,11 @@ public class CPU
 	 */
 	public String gprString() {
 		String s = new String();
-		
+
 		int i = 0;
-		for(Register r : gpr) 
+		for(Register r : gpr)
 			s += "Registro " + i++ + ":\t" + r.toString() + "\n";
-		
+
 		return s;
 	}
 

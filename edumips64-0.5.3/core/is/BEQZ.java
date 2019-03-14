@@ -38,162 +38,42 @@ import java.util.logging.Logger;
   * @author Trubia Massimo, Russo Daniele
  */
 public class BEQZ extends FlowControl_IType
-{       
-        protected final static int OFFSET_FIELD=1;
+{
+  protected final static int OFFSET_FIELD=1;
 	public String OPCODE_VALUE = "000110";
-	
+
 	/** Creates a new instance of BEQZ */
-	public BEQZ() 
+	public BEQZ()
 	{
-            super.OPCODE_VALUE = OPCODE_VALUE;
-	    syntax="%R,%B";
-            name ="BEQZ";
+    super.OPCODE_VALUE = OPCODE_VALUE;
+    syntax="%R,%B";
+    name ="BEQZ";
 	}
 	public void IF()
 	throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
 	{
-		if(cpu.getPredictionMode() == CPU.PREDICTIONMode.NOTTAKEN) {
-			return;
-		}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.TAKEN){
-			cpu.isPredictable=true;
-			//do prediction
-			//in this case we are doing always taken
-			//lets update the pc to target offset
-	        //converting offset into a signed binary value of 64 bits in length
-	        BitSet64 bs=new BitSet64();
-	        bs.writeHalf(params.get(OFFSET_FIELD));
-	        String offset=bs.getBinString();
-	        Register pc=cpu.getPC();
-	        Register b_pc=cpu.getBPC();
-	        String pc_old=cpu.getPC().getBinString();
-	        String pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-	        b_pc.setBits(pc_old, 0);
-	        pc.setBits(pc_new,0);
-			logger.info(">> set PC to "+pc_new+"\n---------------------------------------------");
-		}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL){
-			boolean predictIsTaken=cpu.getLocalPrediction(cpu.getPC().getBinString());
-			if(predictIsTaken) {
-				BitSet64 bs=new BitSet64();
-		        bs.writeHalf(params.get(OFFSET_FIELD));
-		        String offset=bs.getBinString();
-		        Register pc=cpu.getPC();
-		        Register b_pc=cpu.getBPC();
-		        String pc_old=cpu.getPC().getBinString();
-		        String pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-		        b_pc.setBits(pc_old, 0);
-		        pc.setBits(pc_new,0);
-				logger.info("L>> set PC to "+pc_new+"\n---------------------------------------------");
-			}else {
-				return;
-			}
-		}
-
-
-
+    makePrediction(OFFSET_FIELD);
 	}
 	public void ID()
-	throws MispredictTakenException, RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException 	
+	throws MispredictTakenException, RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException
 	{
 			//getting registers rs and rt
 		 if(cpu.getRegister(params.get(RS_FIELD)).getWriteSemaphore() > 0)
 			 throw new RAWException();
 		String rs=cpu.getRegister(params.get(RS_FIELD)).getBinString();
 		String zero = Converter.positiveIntToBin(64, 0);
-                //converting offset into a signed binary value of 64 bits in length
-                BitSet64 bs=new BitSet64();
-                bs.writeHalf(params.get(OFFSET_FIELD));
-                String offset=bs.getBinString();
+    //converting offset into a signed binary value of 64 bits in length
+    BitSet64 bs=new BitSet64();
+    bs.writeHalf(params.get(OFFSET_FIELD));
+    String offset=bs.getBinString();
 		boolean condition=rs.equals(zero);
-		if(condition)
-		{
-			//our prediction was correct nothing to do but update table if we had one
-			if(cpu.getPredictionMode() == CPU.PREDICTIONMode.NOTTAKEN) {
-				String pc_new="";
-	            Register pc=cpu.getPC();
-	            String pc_old=cpu.getPC().getBinString();
-	    
-	            //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
-	            BitSet64 bs_temp=new BitSet64();
-	            bs_temp.writeDoubleWord(-4);
-	            pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
-	    
-	            //updating program counter
-	            pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-	            pc.setBits(pc_new,0);
-				logger.info("Jumped to "+pc_new+"\n---------------------------------------------");
-	            throw new MispredictTakenException(); 
-			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.TAKEN) {
-				logger.info(">> correct taken predict");
-			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-				boolean predictIsTaken;
-				if(cpu.getBPC().getBinString().equals("0")) {
-					predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
-				}else {
-					predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
-				}
-				
-				if(predictIsTaken) {
-					logger.info("L>> correct taken predict updated BHT");
-					cpu.updateLocalPrediction(cpu.getBPC().getBinString(),true);
-				}else {
-					logger.info("L>> incorrect not taken predict updated BHT");
-					String pc_new="";
-		            Register pc=cpu.getPC();
-		            String pc_old=cpu.getPC().getBinString();
-		    
-		            //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
-		            BitSet64 bs_temp=new BitSet64();
-		            bs_temp.writeDoubleWord(-4);
-		            pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
-		    
-		            //updating program counter
-		            pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-		            pc.setBits(pc_new,0);
-					cpu.updateLocalPrediction(pc_old,true);
-					logger.info("Jumped to "+pc_new+"\n---------------------------------------------");
-				}
-			}
-		    
-            
-		}else {
-			if(cpu.getPredictionMode() == CPU.PREDICTIONMode.TAKEN) {
-				//incorrect prediction, is not taken
-		        Register pc=cpu.getPC();
-		        String pc_b=cpu.getBPC().getBinString();
-		        pc.setBits(pc_b,0);
-				logger.info(">> miss was Not Taken set PC to "+pc_b+"\n---------------------------------------------");
-				
-	            throw new MispredictTakenException(); //change is to mispredict nottaken
-			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.NOTTAKEN) {
-				logger.info(">> correct not taken predict");
-			}else if(cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-				boolean predictIsTaken;
-				if(cpu.getBPC().getBinString().equals("0")) {
-					predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
-				}else {
-					predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
-				}
-				if(!predictIsTaken) {
-					logger.info("L>> correct not taken predict updated BHT");
-					cpu.updateLocalPrediction(cpu.getPC().getBinString(),false);
-				}else {
-					logger.info("L>> incorrect taken predict updated BHT");
-					Register pc=cpu.getPC();
-			        String pc_b=cpu.getBPC().getBinString();
-			        pc.setBits(pc_b,0);
-					logger.info(">> miss was Not Taken set PC to "+pc_b+"\n---------------------------------------------");
-					cpu.updateLocalPrediction(pc_b,false);
-			        Register b_pc=cpu.getBPC();
-			        b_pc.setBits("0", 0);
-				}
-			}
-			
-		}
+
+    respondToCondition(condition, offset);
 	}
       public void pack() throws IrregularStringOfBitsException {
 	repr.setBits(OPCODE_VALUE, OPCODE_VALUE_INIT);
 	repr.setBits(Converter.intToBin(RS_FIELD_LENGTH, 0/*params.get(RS_FIELD)*/), RS_FIELD_INIT);
 	repr.setBits(Converter.intToBin(RT_FIELD_LENGTH,params.get(RS_FIELD)/* 0*/), RT_FIELD_INIT);
-	repr.setBits(Converter.intToBin(OFFSET_FIELD_LENGTH, params.get(OFFSET_FIELD)/4), OFFSET_FIELD_INIT); 
-    }  
+	repr.setBits(Converter.intToBin(OFFSET_FIELD_LENGTH, params.get(OFFSET_FIELD)/4), OFFSET_FIELD_INIT);
+    }
 }

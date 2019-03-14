@@ -227,20 +227,14 @@ public class CPU
     */
 	//branch prediction functions
 	//return true if the branch prediction is "taken" , false if the branch prediction is "not taken"
-	public boolean getLocalPrediction(String address) {
-	   int addressVal = 0;
-	   //reading 12 lsb
-	   for(int i = 0; i < 12; i++) {
-	        if(address.charAt(address.length() -i - 1) == '1') {
-	          addressVal += Math.pow(2, i);
-	        }
-	   }
-	   if(localTable[addressVal] < 2) { // predict not taken
-	        return false;
-	   } else { // predict taken
-	        return true;
-	   }
-
+	public boolean getLocalPrediction(Instruction inst) {
+		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
+		int predictorNum = address % localTable.length;
+		if (localTable[predictorNum] < 2) {	// Prediction is not taken
+			return false;
+		} else {														// Prediction is taken
+			return true;
+		}
 	}
 
 	/**
@@ -253,15 +247,16 @@ public class CPU
 				addressVal += Math.pow(2, i);
 			}
 		}
+		int oldVal = localTable[addressVal];
 		if(localTable[addressVal] < 3 && wasTaken) {
 			localTable[addressVal]+=1;
 		}else if(localTable[addressVal] > 0 && !wasTaken) {
 			localTable[addressVal]-=1;
 		}
-		logger.info(">>> updated: "+addressVal);
-    for(int i=0; i < localTable.length;i++) {
+		logger.info(">>> updated: "+addressVal+" from " + oldVal + " to " + localTable[addressVal]);
+    /*for(int i=0; i < localTable.length;i++) {
 				logger.info(i+" -> "+localTable[i]);
-		}
+		}*/
 	}
 
 

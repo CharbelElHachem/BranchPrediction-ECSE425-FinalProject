@@ -90,10 +90,10 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
           b_pc.setBits(pc_old, 0);
           pc.setBits(pc_new,0);
-          logger.info(">> set PC to "+pc_new+"\n---------------------------------------------");
+          logger.info(">> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           break;
         case LOCAL:
-          boolean predictIsTaken=cpu.getLocalPrediction(cpu.getPC().getBinString());
+          boolean predictIsTaken = cpu.getLocalPrediction(this);
           if(predictIsTaken) {
             bs=new BitSet64();
             bs.writeHalf(params.get(offset_field));
@@ -104,13 +104,17 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
             b_pc.setBits(pc_old, 0);
             pc.setBits(pc_new,0);
-            logger.info("L>> set PC to "+pc_new+"\n---------------------------------------------");
+            logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           }
           break;
         case NOTTAKEN:
         default:
           break;
       }
+    }
+
+    public void makePrediction() throws IrregularWriteOperationException, TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException {
+      makePrediction(OFFSET_FIELD);
     }
 
     /**
@@ -120,11 +124,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
       boolean predictIsTaken; // Was the prediction to take the branch?
       switch (cpu.getPredictionMode()) {
         case LOCAL:
-          if (cpu.getBPC().getBinString().equals("0")) {
-            predictIsTaken = cpu.getLocalPrediction(cpu.getPC().getBinString());
-          } else {
-            predictIsTaken = cpu.getLocalPrediction(cpu.getBPC().getBinString());
-          }
+          predictIsTaken = cpu.getLocalPrediction(this);
           break;
         case TAKEN:
           predictIsTaken = true;
@@ -167,6 +167,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         if (predictIsTaken) { // The prediction was incorrect and we branched unnecessarily
           Register pc = cpu.getPC();
           String pc_b = cpu.getBPC().getBinString();
+          String pc_b_h = cpu.getBPC().getHexString();
           pc.setBits(pc_b, 0);
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
             cpu.updateLocalPrediction(pc_b, false);
@@ -176,7 +177,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           } else {
             logger.info("L>> Branch not taken, incorrectly predicted taken");
           }
-          logger.info(">> Setting PC to " + pc_b + "\n---------------------------------------------");
+          logger.info(">> Setting PC to " + pc_b_h + "\n---------------------------------------------");
           throw new MispredictTakenException();
         }
         else {  // Prediction was correct

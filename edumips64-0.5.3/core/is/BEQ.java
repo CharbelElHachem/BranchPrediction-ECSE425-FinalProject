@@ -36,12 +36,18 @@ import edumips64.utils.*;
 
 public class BEQ extends FlowControl_IType {
     final String OPCODE_VALUE="000100";
-    
+
     /** Creates a new instance of BEQ */
     public BEQ() {
         super.OPCODE_VALUE = OPCODE_VALUE;
         syntax="%R,%R,%B";
 	name="BEQ";
+    }
+
+    public void IF()
+    throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
+    {
+      makePrediction(OFFSET_FIELD);
     }
 
     public void ID() throws MispredictTakenException, RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException {
@@ -55,24 +61,9 @@ public class BEQ extends FlowControl_IType {
         bs.writeHalf(params.get(OFFSET_FIELD));
         String offset=bs.getBinString();
         boolean condition=rs.equals(rt);
-        if(condition)
-        {
-            String pc_new="";
-            Register pc=cpu.getPC();
-            String pc_old=cpu.getPC().getBinString();
-            
-            //subtracting 4 to the pc_old temporary variable using bitset64 safe methods
-            BitSet64 bs_temp=new BitSet64();
-            bs_temp.writeDoubleWord(-4);
-            pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
-            
-            //updating program counter
-            pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-            pc.setBits(pc_new,0);
-             
-            throw new MispredictTakenException(); 
-        }    
+
+        respondToCondition(condition, offset);
     }
 
-    
+
 }

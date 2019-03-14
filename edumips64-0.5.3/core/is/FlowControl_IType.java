@@ -139,7 +139,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         if (predictIsTaken) {
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) { // Update the BHT as necessary
             logger.info("L>> Branch correctly predicted taken, updating BHT");
-            cpu.updateLocalPrediction(cpu.getBPC().getBinString(), true);
+            cpu.updateLocalPrediction(this, true);
           } else { // Prediction was correct, but no table to update (i.e. CPU.PREDICTIONMode.TAKEN)
             logger.info("L>> Branch correctly predicted taken");
           }
@@ -156,7 +156,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           pc.setBits(pc_new,0);
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
             logger.info("L>> Branch incorrectly predicted not taken, updating BHT");
-            cpu.updateLocalPrediction(pc_old, true);
+            cpu.updateLocalPrediction(this, true);
           } else {
             logger.info("L>> Branch incorrectly predicted not taken");
           }
@@ -170,7 +170,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           String pc_b_h = cpu.getBPC().getHexString();
           pc.setBits(pc_b, 0);
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-            cpu.updateLocalPrediction(pc_b, false);
+            cpu.updateLocalPrediction(this, false);
             Register b_pc = cpu.getBPC();
             b_pc.setBits("0", 0);
             logger.info("L>> Branch not taken, incorrectly predicted taken, updating BHT");
@@ -182,7 +182,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         }
         else {  // Prediction was correct
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
-            cpu.updateLocalPrediction(cpu.getPC().getBinString(),false);
+            cpu.updateLocalPrediction(this,false);
             logger.info("L>> Correctly predicted not taken, updating BHT");
           } else {
             logger.info("L>> Correctly predicted not taken");

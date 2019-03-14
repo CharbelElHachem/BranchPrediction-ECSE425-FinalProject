@@ -81,6 +81,7 @@ public class CPU
     //prediction memory buffer
     private int[] localTable;
 		private static final int ADDRESSBITS = 12;
+		private static final int NBITS = 2;
 		public boolean isPredictable;
 
 	private static CPU cpu;
@@ -98,7 +99,7 @@ public class CPU
 		// initialize prediction buffer to support indexing by ADDRESSBITS bits
 		localTable = new int[(int)Math.pow(2, ADDRESSBITS)];
 		for(int i = 0; i < localTable.length; i++) {
-			localTable[i] = 1; //weak not taken
+			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
 		}
 
 
@@ -230,7 +231,7 @@ public class CPU
 	public boolean getLocalPrediction(Instruction inst) {
 		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
 		int predictorNum = address % localTable.length;
-		if (localTable[predictorNum] < 2) {	// Prediction is not taken
+		if (localTable[predictorNum] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
 			return false;
 		} else {														// Prediction is taken
 			return true;
@@ -240,20 +241,16 @@ public class CPU
 	/**
 	* Update a local n-bit predictor for the given address.
 	*/
-	public void updateLocalPrediction(String address,boolean wasTaken) {
-		int addressVal = 0;
-		for(int i = 0; i < ADDRESSBITS; i++) {
-	  	if(address.charAt(address.length() -i - 1) == '1') {
-				addressVal += Math.pow(2, i);
-			}
+	public void updateLocalPrediction(Instruction inst, boolean wasTaken) {
+		int address = mem.getInstructionIndex(inst) * 4;
+		int predictorNum = address % localTable.length;
+		int oldVal = localTable[predictorNum];
+		if(localTable[predictorNum] < Math.pow(2, NBITS) - 1 && wasTaken) {
+			localTable[predictorNum]+=1;
+		}else if(localTable[predictorNum] > 0 && !wasTaken) {
+			localTable[predictorNum]-=1;
 		}
-		int oldVal = localTable[addressVal];
-		if(localTable[addressVal] < 3 && wasTaken) {
-			localTable[addressVal]+=1;
-		}else if(localTable[addressVal] > 0 && !wasTaken) {
-			localTable[addressVal]-=1;
-		}
-		logger.info(">>> updated: "+addressVal+" from " + oldVal + " to " + localTable[addressVal]);
+		logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + localTable[predictorNum]);
     /*for(int i=0; i < localTable.length;i++) {
 				logger.info(i+" -> "+localTable[i]);
 		}*/

@@ -37,9 +37,9 @@ public class GUIStatistics extends GUIComponent {
 	StatPanel statPanel;
 	private int nCycles, nInstructions, rawStalls, codeSize, takenStalls;
 	private String pcnew,pcold,pcb;
-	private float cpi;
-	
-	public GUIStatistics () 
+	private float cpi, predictionAccuracy;
+
+	public GUIStatistics ()
 	{
 		super();
 		statPanel = new StatPanel();
@@ -49,8 +49,8 @@ public class GUIStatistics extends GUIComponent {
 		JList statList;
 		String [] statistics = {" Execution", " 0 Cycles", " 0 Instructions", " ", " ", " "," Stalls", " 0 RAW Stalls", " 0 WAW Stalls",
 		       		       " 0 WAR Stalls", " 0 Structural Stalls", " 0 Branch Taken Stalls", " 0 Branch Misprediction Stalls",
-				       " ", " Code Size", " 0 Bytes","pcold null","pcnew null","pcb null"};
-		public StatPanel () 
+				       " ", " Code Size", " 0 Bytes","pcold null","pcnew null","pcb null", "-% Prediction Accuracy"};
+		public StatPanel ()
 		{
 			super();
 			setLayout(new BorderLayout());
@@ -60,9 +60,9 @@ public class GUIStatistics extends GUIComponent {
 			statList.setCellRenderer(new MyListCellRenderer());
 			add(statList,BorderLayout.WEST);
 		}
-	}                         
+	}
 
-	public void setContainer (Container co) 
+	public void setContainer (Container co)
 	{
 		super.setContainer(co);
 		cont.add(statPanel);
@@ -83,10 +83,11 @@ public class GUIStatistics extends GUIComponent {
 			pcb = cpu.getBPC().getHexString();
 		}
 		catch(IrregularStringOfBitsException ex){
-			
+
 		}
 
 		codeSize = (cpu.getMemory().getInstructionsNumber())*4;
+		predictionAccuracy = cpu.getPredictionAccuracy();
 	}
 
 	public void draw ()
@@ -96,22 +97,22 @@ public class GUIStatistics extends GUIComponent {
 
 	class MyListCellRenderer implements ListCellRenderer {
 			private JLabel label;
-      
+
 			public MyListCellRenderer() {
 			}
-   
-			public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus) 
+
+			public Component getListCellRendererComponent(JList list, Object value, int index, boolean isSelected, boolean cellHasFocus)
 			{
 				statPanel.statList = list;
 				label = new JLabel();
 				Font f = new Font("Monospaced", Font.PLAIN, 12);
 				switch (index) {
-					case 0: 
+					case 0:
 						label.setText(" " + CurrentLocale.getString("EXECUTION"));
 						label.setForeground(Color.red);
 						label.setFont(f);
 						return label;
-					case 1: 
+					case 1:
 						if(nCycles != 1)
 							label.setText(" " + nCycles + " " + CurrentLocale.getString("CYCLES"));
 						else
@@ -144,7 +145,7 @@ public class GUIStatistics extends GUIComponent {
 					case 5:
 						label.setText(" ");
 						return label;
-					case 6:	
+					case 6:
 						label.setText(" " + CurrentLocale.getString("STALLS"));
 						label.setForeground(Color.red);
 						label.setFont(f);
@@ -198,6 +199,10 @@ public class GUIStatistics extends GUIComponent {
 						return label;
 					case 18:
 						label.setText(pcb+" PC_B");
+						label.setFont(f);
+						return label;
+					case 19:
+						label.setText(" " + predictionAccuracy*100 + "% Prediction Accuracy");
 						label.setFont(f);
 						return label;
 				}

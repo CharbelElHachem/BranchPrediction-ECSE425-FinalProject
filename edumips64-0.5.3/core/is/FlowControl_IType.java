@@ -122,6 +122,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
     */
     public void respondToCondition(boolean condition, String offset) throws IrregularWriteOperationException, TwosComplementSumException, IrregularStringOfBitsException, MispredictTakenException {
       boolean predictIsTaken; // Was the prediction to take the branch?
+      cpu.predictionsTotal++;
       switch (cpu.getPredictionMode()) {
         case LOCAL:
           predictIsTaken = cpu.getLocalPrediction(this);
@@ -137,6 +138,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
   		{
         // Update based on prediction
         if (predictIsTaken) {
+          cpu.predictionsCorrect++;
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) { // Update the BHT as necessary
             logger.info("L>> Branch correctly predicted taken, updating BHT");
             cpu.updateLocalPrediction(this, true);
@@ -181,6 +183,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           throw new MispredictTakenException();
         }
         else {  // Prediction was correct
+          cpu.predictionsCorrect++;
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
             cpu.updateLocalPrediction(this,false);
             logger.info("L>> Correctly predicted not taken, updating BHT");

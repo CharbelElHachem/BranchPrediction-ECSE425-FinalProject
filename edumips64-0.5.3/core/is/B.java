@@ -2,7 +2,7 @@
  * B.java
  *
  * Instruction B of the MIPS64 Instruction Set
- * (c) 2007 EduMips64 project - Andrea Milazzo (MancaUSoft) 
+ * (c) 2007 EduMips64 project - Andrea Milazzo (MancaUSoft)
  *
  * This file is part of the EduMIPS64 project, and is released under the GNU
  * General Public License.
@@ -29,9 +29,9 @@ import edumips64.utils.*;
  *         Syntax: B offset
  *         B denote an unconditional branch. The actual instruction is interpreted by the
  *         hardware as BEQ r0, r0, offset.
- *    
+ *
  *</pre>
-  * @author Andrea Milazzo 
+  * @author Andrea Milazzo
  */
 
 public class B extends FlowControl_IType {
@@ -45,7 +45,13 @@ public class B extends FlowControl_IType {
 	name="B";
     }
 
-    public void ID() throws RAWException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException {
+    public void IF()
+    throws TwosComplementSumException, IrregularStringOfBitsException, IrregularWriteOperationException
+    {
+      makePrediction(OFFSET_FIELD);
+    }
+
+    public void ID() throws RAWException, MispredictTakenException, IrregularWriteOperationException, IrregularStringOfBitsException, JumpException,TwosComplementSumException {
         //getting registers rs and rt
         //converting offset into a signed binary value of 64 bits in length
         BitSet64 bs=new BitSet64();
@@ -65,12 +71,12 @@ public class B extends FlowControl_IType {
         pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
         pc.setBits(pc_new,0);
 
-        throw new JumpException(); 
-    }    
-    
+        respondToCondition(true, offset);
+    }
+
     public void pack() throws IrregularStringOfBitsException {
         repr.setBits(OPCODE_VALUE, OPCODE_VALUE_INIT);
-        repr.setBits(Converter.intToBin(OFFSET_FIELD_LENGTH, params.get(OFFSET_FIELD)/4), OFFSET_FIELD_INIT); 
-    }    
+        repr.setBits(Converter.intToBin(OFFSET_FIELD_LENGTH, params.get(OFFSET_FIELD)/4), OFFSET_FIELD_INIT);
+    }
 
 }

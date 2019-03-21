@@ -89,6 +89,9 @@ public class CPU
 	/** Statistics */
 	private int cycles, instructions, RAWStalls, takenStalls;
 
+	/* Branching statistics */
+	public int predictionsCorrect, predictionsTotal;
+
 	/** Static initializer */
 	static {
 		cpu = null;
@@ -136,6 +139,15 @@ public class CPU
 
 	public PREDICTIONMode getPredictionMode() {
 		return predictMode;
+	}
+
+	public float getPredictionAccuracy() {
+		if (predictionsTotal != 0) {
+			return (float)predictionsCorrect/(float)predictionsTotal;
+		}
+		else {
+			return Float.NaN;
+		}
 	}
 
 	/** Sets the CPU status.

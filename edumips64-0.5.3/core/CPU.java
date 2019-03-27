@@ -490,7 +490,7 @@ public class CPU
 
     	//reset local branch history table
 		for(int i=0; i < localTable.length;i++) {
-			localTable[i]=1;//weak not taken
+			localTable[i]=(int)Math.pow(2, NBITS - 1) - 1;//weak not taken
 		}
 
 		// Reset stati della CPU
@@ -522,6 +522,10 @@ public class CPU
 
 		// Reset tracefile
 		Dinero.getInstance().reset();
+
+		// Reset branch Statistics
+		predictionsCorrect = 0;
+		predictionsTotal = 0;
 
 		logger.info("CPU Resetted");
     }

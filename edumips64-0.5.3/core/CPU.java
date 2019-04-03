@@ -240,7 +240,7 @@ public class CPU
     */
 	//branch prediction functions
 	//return true if the branch prediction is "taken" , false if the branch prediction is "not taken"
-	public boolean getLocalPrediction(Instruction inst) {
+	public boolean getPrediction(Instruction inst) {
 		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
 		int predictorNum = address % localTable.length;
 		if (localTable[predictorNum] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
@@ -253,7 +253,7 @@ public class CPU
 	/**
 	* Update a local n-bit predictor for the given address.
 	*/
-	public void updateLocalPrediction(Instruction inst, boolean wasTaken) {
+	public void updatePrediction(Instruction inst, boolean wasTaken) {
 		int address = mem.getInstructionIndex(inst) * 4;
 		int predictorNum = address % localTable.length;
 		int oldVal = localTable[predictorNum];

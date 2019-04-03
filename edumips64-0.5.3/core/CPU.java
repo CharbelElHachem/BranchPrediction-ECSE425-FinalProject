@@ -42,6 +42,9 @@ public class CPU
 	private Register pc,old_pc,b_pc;
 	private Register LO,HI;
 
+	/** Global Branch History */
+	private int gbh;
+
   /** Pipeline status*/
   public enum PipeStatus {IF, ID, EX, MEM, WB};
 
@@ -63,7 +66,7 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
-	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBAL}
+	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, CORRELATING}
 	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
@@ -79,8 +82,10 @@ public class CPU
     public static final int DATALIMIT = 512;	// bus da 12 bit (2^12 / 8)
 
     //prediction memory buffer
-    private int[] localTable;
+    //private int[] patternHistoryTable;
+		private int[][] patternHistoryTable;
 		private static final int ADDRESSBITS = 12;
+		private static final int MBITS = 2;
 		private static final int NBITS = 2;
 		public boolean isPredictable;
 
@@ -98,11 +103,20 @@ public class CPU
 	}
 	private CPU()
 	{
-		predictMode = PREDICTIONMode.LOCAL;
+		predictMode = PREDICTIONMode.CORRELATING;
 		// initialize prediction buffer to support indexing by ADDRESSBITS bits
-		localTable = new int[(int)Math.pow(2, ADDRESSBITS)];
-		for(int i = 0; i < localTable.length; i++) {
-			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
+		/*patternHistoryTable = new int[(int)Math.pow(2, ADDRESSBITS)];
+		for(int i = 0; i < patternHistoryTable.length; i++) {
+			patternHistoryTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
+		}*/
+
+		gbh = 0;
+		patternHistoryTable = new int[(int)Math.pow(2, ADDRESSBITS)][(int)Math.pow(2, MBITS)];
+		for (int i= 0; i < patternHistoryTable.length; i++) {
+			for (int j = 0; j < patternHistoryTable[i].length; j++) {
+				// Initialize to weak not taken
+				patternHistoryTable[i][j] = (int)Math.pow(2, NBITS-1) -1;
+			}
 		}
 
 
@@ -242,8 +256,9 @@ public class CPU
 	//return true if the branch prediction is "taken" , false if the branch prediction is "not taken"
 	public boolean getPrediction(Instruction inst) {
 		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
-		int predictorNum = address % localTable.length;
-		if (localTable[predictorNum] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
+		//int predictorNum = address % patternHistoryTable.length;
+		int predictorNum = address & ((int) Math.pow(2, ADDRESSBITS + 1) - 1);
+		if (patternHistoryTable[predictorNum][gbh] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
 			return false;
 		} else {														// Prediction is taken
 			return true;
@@ -255,16 +270,21 @@ public class CPU
 	*/
 	public void updatePrediction(Instruction inst, boolean wasTaken) {
 		int address = mem.getInstructionIndex(inst) * 4;
-		int predictorNum = address % localTable.length;
-		int oldVal = localTable[predictorNum];
-		if(localTable[predictorNum] < Math.pow(2, NBITS) - 1 && wasTaken) {
-			localTable[predictorNum]+=1;
-		}else if(localTable[predictorNum] > 0 && !wasTaken) {
-			localTable[predictorNum]-=1;
+		//int predictorNum = address % patternHistoryTable.length;
+		int predictorNum = address & ((int) Math.pow(2, ADDRESSBITS + 1) - 1);
+		int oldVal = patternHistoryTable[predictorNum][gbh];
+		if(patternHistoryTable[predictorNum][gbh] < Math.pow(2, NBITS) - 1 && wasTaken) {
+			patternHistoryTable[predictorNum][gbh] += 1;
+		}else if(patternHistoryTable[predictorNum][gbh] > 0 && !wasTaken) {
+			patternHistoryTable[predictorNum][gbh] -= 1;
 		}
-		logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + localTable[predictorNum]);
-    /*for(int i=0; i < localTable.length;i++) {
-				logger.info(i+" -> "+localTable[i]);
+		// Update gbh
+		gbh = (gbh << 2);
+		if (wasTaken) gbh += 1;
+		gbh &= (int) Math.pow(2, MBITS + 1) - 1;	// MASK so only MBITS are used
+		logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + patternHistoryTable[predictorNum]);
+    /*for(int i=0; i < patternHistoryTable.length;i++) {
+				logger.info(i+" -> "+patternHistoryTable[i]);
 		}*/
 	}
 
@@ -489,8 +509,10 @@ public class CPU
     {
 
     	//reset local branch history table
-		for(int i=0; i < localTable.length;i++) {
-			localTable[i]=(int)Math.pow(2, NBITS - 1) - 1;//weak not taken
+		for(int i=0; i < patternHistoryTable.length;i++) {
+			for (int j=  0; j < patternHistoryTable[i].length; j++) {
+				patternHistoryTable[i][gbh] = (int)Math.pow(2, NBITS - 1) - 1;//weak not taken
+			}
 		}
 
 		// Reset stati della CPU
@@ -507,9 +529,12 @@ public class CPU
 		HI.reset();
 
 		// Reset program counter
-        pc.reset();
+    pc.reset();
 		old_pc.reset();
 		b_pc.reset();
+
+		// Reset global branch History
+		gbh = 0;
 
 		// Reset memoria
         mem.reset();

@@ -63,7 +63,7 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
-	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBAL}
+	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBALCORRELATED}
 	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
@@ -80,9 +80,13 @@ public class CPU
 
     //prediction memory buffer
     private int[] localTable;
-		private static final int ADDRESSBITS = 12;
-		private static final int NBITS = 2;
-		public boolean isPredictable;
+    private int[][] patternHistoryTable;
+	private int globalHistoryBuffer;
+	private int historyBufferBitmask;
+	private static final int ADDRESSBITS = 12;
+	private static int NBITS = 2;
+	private static int MBITS = 2;
+	public boolean isPredictable;
 
 	private static CPU cpu;
 
@@ -98,14 +102,22 @@ public class CPU
 	}
 	private CPU()
 	{
-		predictMode = PREDICTIONMode.LOCAL;
+		predictMode = PREDICTIONMode.GLOBALCORRELATED;
 		// initialize prediction buffer to support indexing by ADDRESSBITS bits
 		localTable = new int[(int)Math.pow(2, ADDRESSBITS)];
 		for(int i = 0; i < localTable.length; i++) {
 			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
 		}
-
-
+		patternHistoryTable = new int[(int)Math.pow(2, ADDRESSBITS)][(int)Math.pow(2, MBITS)];
+		for(int i = 0; i < patternHistoryTable.length; i++) {
+			for(int j = 0; j< patternHistoryTable[0].length; j++) {
+				patternHistoryTable[i][j] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
+			}
+		}
+		globalHistoryBuffer = (int)Math.pow(2,MBITS-1)-1; //initialized with a balanced global history;
+		historyBufferBitmask = (int)Math.pow(2,MBITS)-1;
+		
+		
 		// To avoid future singleton problems
 		Instruction dummy = Instruction.buildInstruction("BUBBLE");
 
@@ -243,11 +255,22 @@ public class CPU
 	public boolean getPrediction(Instruction inst) {
 		int address = mem.getInstructionIndex(inst) * 4;	// Each instruction is 4 bytes
 		int predictorNum = address % localTable.length;
-		if (localTable[predictorNum] < Math.pow(2, NBITS - 1)) {	// Prediction is not taken
-			return false;
-		} else {														// Prediction is taken
-			return true;
+		if(predictMode == cpu.predictMode.LOCAL) {
+			if (localTable[predictorNum]< Math.pow(2, NBITS - 1)) {	// Prediction is not taken
+				return false;
+			} else {														// Prediction is taken
+				return true;
+			}
+		}else if(predictMode == cpu.predictMode.GLOBALCORRELATED) {
+			if (patternHistoryTable[predictorNum][globalHistoryBuffer] < Math.pow(2, NBITS - 1)) {
+				return false;
+			} else {
+				return true;
+			}
+		}else {
+			return false;//should never happens
 		}
+		
 	}
 
 	/**
@@ -257,12 +280,22 @@ public class CPU
 		int address = mem.getInstructionIndex(inst) * 4;
 		int predictorNum = address % localTable.length;
 		int oldVal = localTable[predictorNum];
-		if(localTable[predictorNum] < Math.pow(2, NBITS) - 1 && wasTaken) {
-			localTable[predictorNum]+=1;
-		}else if(localTable[predictorNum] > 0 && !wasTaken) {
-			localTable[predictorNum]-=1;
+		if(predictMode == cpu.predictMode.LOCAL) {
+			if(localTable[predictorNum] < Math.pow(2, NBITS) - 1 && wasTaken) {
+				localTable[predictorNum]+=1;
+			}else if(localTable[predictorNum] > 0 && !wasTaken) {
+				localTable[predictorNum]-=1;
+			}
+			logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + localTable[predictorNum]);
+		}else if(predictMode == cpu.predictMode.GLOBALCORRELATED) {
+			if(patternHistoryTable[predictorNum][globalHistoryBuffer] < Math.pow(2, NBITS) - 1 && wasTaken) {
+				patternHistoryTable[predictorNum][globalHistoryBuffer]+=1;
+			}else if(patternHistoryTable[predictorNum][globalHistoryBuffer] > 0 && !wasTaken) {
+				patternHistoryTable[predictorNum][globalHistoryBuffer]-=1;
+			}
+			globalHistoryBuffer=((globalHistoryBuffer << 1) & historyBufferBitmask) | (wasTaken?0x1:0x0);
 		}
-		logger.info(">>> updated: "+predictorNum+" from " + oldVal + " to " + localTable[predictorNum]);
+		
     /*for(int i=0; i < localTable.length;i++) {
 				logger.info(i+" -> "+localTable[i]);
 		}*/

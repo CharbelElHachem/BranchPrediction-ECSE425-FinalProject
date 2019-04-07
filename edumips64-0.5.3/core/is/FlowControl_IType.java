@@ -77,6 +77,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
       BitSet64 bs;
       Register pc, b_pc;
       String pc_old, pc_new, offset;
+      boolean predictIsTaken;
       switch(cpu.getPredictionMode()) {
         case TAKEN:
           cpu.isPredictable = true;
@@ -93,7 +94,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           logger.info(">> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           break;
         case LOCAL:
-          boolean predictIsTaken = cpu.getPrediction(this);
+          predictIsTaken = cpu.getPrediction(this);
           if(predictIsTaken) {
             bs=new BitSet64();
             bs.writeHalf(params.get(offset_field));
@@ -107,6 +108,21 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           }
           break;
+        case GLOBALCORRELATED:
+            predictIsTaken = cpu.getPrediction(this);
+            if(predictIsTaken) {
+              bs=new BitSet64();
+              bs.writeHalf(params.get(offset_field));
+              offset=bs.getBinString();
+              pc=cpu.getPC();
+              b_pc=cpu.getBPC();
+              pc_old=cpu.getPC().getBinString();
+              pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
+              b_pc.setBits(pc_old, 0);
+              pc.setBits(pc_new,0);
+              logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
+            }
+            break;
         case NOTTAKEN:
         default:
           break;
@@ -127,6 +143,9 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         case LOCAL:
           predictIsTaken = cpu.getPrediction(this);
           break;
+        case GLOBALCORRELATED:
+          predictIsTaken = cpu.getPrediction(this);
+          break;
         case TAKEN:
           predictIsTaken = true;
           break;
@@ -139,7 +158,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         // Update based on prediction
         if (predictIsTaken) {
           cpu.predictionsCorrect++;
-          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) { // Update the BHT as necessary
+          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) { // Update the BHT as necessary
             logger.info("L>> Branch correctly predicted taken, updating BHT");
             cpu.updatePrediction(this, true);
           } else { // Prediction was correct, but no table to update (i.e. CPU.PREDICTIONMode.TAKEN)
@@ -156,7 +175,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
           pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
           pc.setBits(pc_new,0);
-          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
+          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             logger.info("L>> Branch incorrectly predicted not taken, updating BHT");
             cpu.updatePrediction(this, true);
           } else {
@@ -171,7 +190,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           String pc_b = cpu.getBPC().getBinString();
           String pc_b_h = cpu.getBPC().getHexString();
           pc.setBits(pc_b, 0);
-          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
+          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             cpu.updatePrediction(this, false);
             Register b_pc = cpu.getBPC();
             b_pc.setBits("0", 0);
@@ -184,7 +203,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
         }
         else {  // Prediction was correct
           cpu.predictionsCorrect++;
-          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL) {
+          if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             cpu.updatePrediction(this,false);
             logger.info("L>> Correctly predicted not taken, updating BHT");
           } else {

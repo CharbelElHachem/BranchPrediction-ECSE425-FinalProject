@@ -35,7 +35,7 @@ import javax.swing.*;
 public class GUIStatistics extends GUIComponent {
 
 	StatPanel statPanel;
-	private int nCycles, nInstructions, rawStalls, codeSize, takenStalls;
+	private int nCycles, nInstructions, rawStalls, codeSize, takenStalls, nBranches;
 	private String pcnew,pcold,pcb;
 	private float cpi, predictionAccuracy;
 
@@ -49,7 +49,7 @@ public class GUIStatistics extends GUIComponent {
 		JList statList;
 		String [] statistics = {" Execution", " 0 Cycles", " 0 Instructions", " ", " ", " "," Stalls", " 0 RAW Stalls", " 0 WAW Stalls",
 		       		       " 0 WAR Stalls", " 0 Structural Stalls", " 0 Branch Taken Stalls", " 0 Branch Misprediction Stalls",
-				       " ", " Code Size", " 0 Bytes","pcold null","pcnew null","pcb null", "-% Prediction Accuracy"};
+				       " ", " Code Size", " 0 Bytes","pcold null","pcnew null","pcb null", "-% Prediction Accuracy", "0 Branches"};
 		public StatPanel ()
 		{
 			super();
@@ -88,6 +88,7 @@ public class GUIStatistics extends GUIComponent {
 
 		codeSize = (cpu.getMemory().getInstructionsNumber())*4;
 		predictionAccuracy = cpu.getPredictionAccuracy();
+		nBranches = cpu.getBranches();
 	}
 
 	public void draw ()
@@ -203,6 +204,10 @@ public class GUIStatistics extends GUIComponent {
 						return label;
 					case 19:
 						label.setText(" " + predictionAccuracy*100 + "% Prediction Accuracy");
+						label.setFont(f);
+						return label;
+					case 20:
+						label.setText(" " + nBranches + " Branches");
 						label.setFont(f);
 						return label;
 				}

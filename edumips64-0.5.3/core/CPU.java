@@ -85,7 +85,7 @@ public class CPU
 	private int historyBufferBitmask;
 	private static final int ADDRESSBITS = 12;
 	private static int NBITS = 2;
-	private static int MBITS = 2;
+	private static int MBITS = 12;
 	public boolean isPredictable;
 
 	private static CPU cpu;
@@ -160,6 +160,10 @@ public class CPU
 		else {
 			return Float.NaN;
 		}
+	}
+
+	public int getBranches() {
+		return predictionsTotal;
 	}
 
 	/** Sets the CPU status.

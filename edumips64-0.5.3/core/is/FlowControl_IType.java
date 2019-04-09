@@ -94,6 +94,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           logger.info(">> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           break;
         case LOCAL:
+        case GLOBALCORRELATED:
           predictIsTaken = cpu.getPrediction(this);
           if(predictIsTaken) {
             bs=new BitSet64();
@@ -108,21 +109,6 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           }
           break;
-        case GLOBALCORRELATED:
-            predictIsTaken = cpu.getPrediction(this);
-            if(predictIsTaken) {
-              bs=new BitSet64();
-              bs.writeHalf(params.get(offset_field));
-              offset=bs.getBinString();
-              pc=cpu.getPC();
-              b_pc=cpu.getBPC();
-              pc_old=cpu.getPC().getBinString();
-              pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
-              b_pc.setBits(pc_old, 0);
-              pc.setBits(pc_new,0);
-              logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
-            }
-            break;
         case NOTTAKEN:
         default:
           break;
@@ -141,8 +127,6 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
       cpu.predictionsTotal++;
       switch (cpu.getPredictionMode()) {
         case LOCAL:
-          predictIsTaken = cpu.getPrediction(this);
-          break;
         case GLOBALCORRELATED:
           predictIsTaken = cpu.getPrediction(this);
           break;

@@ -116,8 +116,8 @@ public class CPU
 		}
 		globalHistoryBuffer = (int)Math.pow(2,MBITS-1)-1; //initialized with a balanced global history;
 		historyBufferBitmask = (int)Math.pow(2,MBITS)-1;
-		
-		
+
+
 		// To avoid future singleton problems
 		Instruction dummy = Instruction.buildInstruction("BUBBLE");
 
@@ -270,7 +270,7 @@ public class CPU
 		}else {
 			return false;//should never happens
 		}
-		
+
 	}
 
 	/**
@@ -295,7 +295,7 @@ public class CPU
 			}
 			globalHistoryBuffer=((globalHistoryBuffer << 1) & historyBufferBitmask) | (wasTaken?0x1:0x0);
 		}
-		
+
     /*for(int i=0; i < localTable.length;i++) {
 				logger.info(i+" -> "+localTable[i]);
 		}*/
@@ -524,6 +524,12 @@ public class CPU
     	//reset local branch history table
 		for(int i=0; i < localTable.length;i++) {
 			localTable[i]=(int)Math.pow(2, NBITS - 1) - 1;//weak not taken
+		}
+
+		for(int i = 0; i < patternHistoryTable.length; i++) {
+			for(int j = 0; j< patternHistoryTable[0].length; j++) {
+				patternHistoryTable[i][j] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
+			}
 		}
 
 		// Reset stati della CPU

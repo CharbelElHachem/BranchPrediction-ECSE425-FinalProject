@@ -1,0 +1,11 @@
+In order to verify the modifications work as expected, run
+the benchmarks used (isort, vet20parinum, compitomin, and matrixmult)
+or any other benchmark to ensure that the number of branches matches
+the default (NOT_TAKEN) mode of EduMIPS64. If the number of branches
+match then execution took the same path and since no modifications
+were made to how non-branching instructions are executed the results
+would be the same.
+
+An alternative is to directly compare the register values, but considering
+the number of possible values of m and n and the number of registers this
+can be incredibly time consuming.

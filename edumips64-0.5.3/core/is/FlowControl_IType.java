@@ -93,7 +93,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           pc.setBits(pc_new,0);
           logger.info(">> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           break;
-        case LOCAL:
+        case LOCAL:             // Get the prediction and if taken then modify PC
         case GLOBALCORRELATED:
           predictIsTaken = cpu.getPrediction(this);
           if(predictIsTaken) {
@@ -109,7 +109,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             logger.info("L>> set PC to "+pc.getHexString()+"\n---------------------------------------------");
           }
           break;
-        case NOTTAKEN:
+        case NOTTAKEN:  // Default behavior - nothing to modify or do
         default:
           break;
       }
@@ -124,7 +124,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
     */
     public void respondToCondition(boolean condition, String offset) throws IrregularWriteOperationException, TwosComplementSumException, IrregularStringOfBitsException, MispredictTakenException {
       boolean predictIsTaken; // Was the prediction to take the branch?
-      cpu.predictionsTotal++;
+      cpu.predictionsTotal++; // For statistics on percent accuracy
       switch (cpu.getPredictionMode()) {
         case LOCAL:
         case GLOBALCORRELATED:
@@ -159,6 +159,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           pc_old=InstructionsUtils.twosComplementSum(pc_old,bs_temp.getBinString());
           pc_new=InstructionsUtils.twosComplementSum(pc_old,offset);
           pc.setBits(pc_new,0);
+          // Update the predictors (if necessary)
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             logger.info("L>> Branch incorrectly predicted not taken, updating BHT");
             cpu.updatePrediction(this, true);
@@ -166,7 +167,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             logger.info("L>> Branch incorrectly predicted not taken");
           }
           logger.info("Branched to " + pc_new + "\n---------------------------------------------");
-          throw new MispredictTakenException();
+          throw new MispredictTakenException(); // Flushes current IF
         }
   		} else {   // The condition is false and the branch is not to be taken
         if (predictIsTaken) { // The prediction was incorrect and we branched unnecessarily
@@ -174,6 +175,7 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
           String pc_b = cpu.getBPC().getBinString();
           String pc_b_h = cpu.getBPC().getHexString();
           pc.setBits(pc_b, 0);
+          // Update predictor if necessary
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             cpu.updatePrediction(this, false);
             Register b_pc = cpu.getBPC();
@@ -183,10 +185,11 @@ public abstract class FlowControl_IType extends FlowControlInstructions {
             logger.info("L>> Branch not taken, incorrectly predicted taken");
           }
           logger.info(">> Setting PC to " + pc_b_h + "\n---------------------------------------------");
-          throw new MispredictTakenException();
+          throw new MispredictTakenException(); // Flushes current IF
         }
         else {  // Prediction was correct
           cpu.predictionsCorrect++;
+          // Update prediction if necessary
           if (cpu.getPredictionMode() == CPU.PREDICTIONMode.LOCAL || cpu.getPredictionMode() == CPU.PREDICTIONMode.GLOBALCORRELATED) {
             cpu.updatePrediction(this,false);
             logger.info("L>> Correctly predicted not taken, updating BHT");

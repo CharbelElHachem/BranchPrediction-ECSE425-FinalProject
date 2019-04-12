@@ -108,6 +108,7 @@ public class CPU
 		for(int i = 0; i < localTable.length; i++) {
 			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
 		}
+		// Initialize correlating pattern history table
 		patternHistoryTable = new int[(int)Math.pow(2, ADDRESSBITS)][(int)Math.pow(2, MBITS)];
 		for(int i = 0; i < patternHistoryTable.length; i++) {
 			for(int j = 0; j< patternHistoryTable[0].length; j++) {
@@ -529,7 +530,7 @@ public class CPU
 		for(int i=0; i < localTable.length;i++) {
 			localTable[i]=(int)Math.pow(2, NBITS - 1) - 1;//weak not taken
 		}
-
+		// reset pattern history table
 		for(int i = 0; i < patternHistoryTable.length; i++) {
 			for(int j = 0; j< patternHistoryTable[0].length; j++) {
 				patternHistoryTable[i][j] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken

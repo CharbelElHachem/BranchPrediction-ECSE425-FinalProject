@@ -63,7 +63,7 @@ public class CPU
 	 * 	method can't be executed.
 	 * */
 	public enum CPUStatus {READY, RUNNING, STOPPING, HALTED};
-	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBALCORRELATED}
+	public enum PREDICTIONMode {NOTTAKEN, TAKEN, LOCAL, GLOBALCORRELATED}//enum used for predictor selection
 	private PREDICTIONMode predictMode;
 	private CPUStatus status;
 
@@ -78,14 +78,14 @@ public class CPU
     public static final int CODELIMIT = 1024;	// bus da 12 bit (2^12 / 4)
     public static final int DATALIMIT = 512;	// bus da 12 bit (2^12 / 8)
 
-    //prediction memory buffer
-    private int[] localTable;
-    private int[][] patternHistoryTable;
-	private int globalHistoryBuffer;
-	private int historyBufferBitmask;
-	private static final int ADDRESSBITS = 12;
-	private static int NBITS = 2;
-	private static int MBITS = 12;
+    //prediction buffers
+    private int[] localTable;//local n-bit predictor branch history table
+    private int[][] patternHistoryTable;//global (m,n) correlated predictor pattern history table
+	private int globalHistoryBuffer;//global (m,n) correlated predictor global history buffer
+	private int historyBufferBitmask;//bitmask used to shift new prediction data into the global history buffer
+	private static final int ADDRESSBITS = 12;//number of bits used to index our prediction tables
+	private static int NBITS = 2;//n
+	private static int MBITS = 12;//m used in the case of the correlated predictor
 	public boolean isPredictable;
 
 	private static CPU cpu;
@@ -102,8 +102,9 @@ public class CPU
 	}
 	private CPU()
 	{
+		// Initialize the prediction mode
 		predictMode = PREDICTIONMode.GLOBALCORRELATED;
-		// initialize prediction buffer to support indexing by ADDRESSBITS bits
+		// Initialize prediction buffer to support indexing by ADDRESSBITS bits
 		localTable = new int[(int)Math.pow(2, ADDRESSBITS)];
 		for(int i = 0; i < localTable.length; i++) {
 			localTable[i] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
@@ -115,7 +116,8 @@ public class CPU
 				patternHistoryTable[i][j] = (int)Math.pow(2, NBITS-1) - 1; //weak not taken
 			}
 		}
-		globalHistoryBuffer = (int)Math.pow(2,MBITS-1)-1; //initialized with a balanced global history;
+		// Initialize the global history buffer with a balanced global history;
+		globalHistoryBuffer = (int)Math.pow(2,MBITS-1)-1; 
 		historyBufferBitmask = (int)Math.pow(2,MBITS)-1;
 
 
@@ -153,7 +155,7 @@ public class CPU
 	public PREDICTIONMode getPredictionMode() {
 		return predictMode;
 	}
-
+	// computes prediction accuracy to assist benchmarks
 	public float getPredictionAccuracy() {
 		if (predictionsTotal != 0) {
 			return (float)predictionsCorrect/(float)predictionsTotal;
@@ -279,7 +281,10 @@ public class CPU
 	}
 
 	/**
-	* Update a local n-bit predictor for the given address.
+	* If predictMode is LOCAL: Updates a local n-bit predictor for the given address with the branch outcome.
+	* If predictMode is GLOBALCORRELATED: Updates a n-bit predictor indexed by
+	* the global history register for the given address with the branch outcome then
+	* update the global history register with the branch outcome. 
 	*/
 	public void updatePrediction(Instruction inst, boolean wasTaken) {
 		int address = mem.getInstructionIndex(inst) * 4;
@@ -298,12 +303,11 @@ public class CPU
 			}else if(patternHistoryTable[predictorNum][globalHistoryBuffer] > 0 && !wasTaken) {
 				patternHistoryTable[predictorNum][globalHistoryBuffer]-=1;
 			}
+			// Left shifts the global history buffer then does OR with 0x1 or 0x0 depending if the outcome is taken or not
+			// then effectuate an AND operation with a bitmask in order discard bits in positions higher than m
 			globalHistoryBuffer=((globalHistoryBuffer << 1) & historyBufferBitmask) | (wasTaken?0x1:0x0);
 		}
 
-    /*for(int i=0; i < localTable.length;i++) {
-				logger.info(i+" -> "+localTable[i]);
-		}*/
 	}
 
 
